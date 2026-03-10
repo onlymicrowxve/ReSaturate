@@ -74,9 +74,22 @@ public class ColorWeapon : MonoBehaviour
         Vector3 targetPoint;
 
         if (Physics.Raycast(ray, out hit, 100f))
+        {
             targetPoint = hit.point;
+
+            NexusAntenna antennaColpita = hit.collider.GetComponent<NexusAntenna>();
+            
+            // --- CONTROLLO POTENZIATO ---
+            // Verifica che l'antenna non sia nulla E che sia ancora attiva in gioco
+            if (antennaColpita != null && antennaColpita.gameObject.activeInHierarchy)
+            {
+                antennaColpita.RiceviColore(1);
+            }
+        }
         else
+        {
             targetPoint = ray.GetPoint(100f);
+        }
 
         Vector3 shootDirection = (targetPoint - firePoint.position).normalized;
 
