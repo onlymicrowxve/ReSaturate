@@ -11,7 +11,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Playground Test.unity
     guid: 99c9720ab356a0642a771bea13969a05
-  - enabled: 1
+  - enabled: 0
     path: "Assets/Scenes/Citt\xE0 di Prova per tutto quanto.unity"
     guid: 7e6d3f4e5d896154ab4438845532ac3e
   - enabled: 1
@@ -20,6 +20,9 @@ EditorBuildSettings:
   - enabled: 1
     path: "Assets/Scenes/Citt\xE0.unity"
     guid: cc02cee417eaed04889d58aec6802419
+  - enabled: 1
+    path: Assets/Scenes/Bosco.unity
+    guid: 9425259e91b8c27438a729d2ee4e97a1
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

@@ -1,6 +1,7 @@
 using UnityEngine;
 using TMPro;
-using UnityEngine.EventSystems; 
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 public class ColorWeapon : MonoBehaviour
 {
@@ -8,63 +9,80 @@ public class ColorWeapon : MonoBehaviour
     public bool isHeld = false;
 
     [Header("Statistiche")]
-    public int maxAmmo = 20;
-    public int currentAmmo;
+    public int colpiPrimaCooldown = 20;
     public float fireRate = 0.2f;
     public float bulletSpeed = 40f;
+    public float cooldownDurata = 4f;
 
     [Header("Riferimenti")]
-    public Camera fpsCamera;       
-    public Transform firePoint;     
-    public GameObject bulletPrefab; 
+    public Camera fpsCamera;
+    public Transform firePoint;
+    public GameObject bulletPrefab;
     public ParticleSystem muzzleFlash;
+    public Slider cooldownSlider; 
 
     [Header("Interfaccia Utente (UI)")]
     public TextMeshProUGUI ammoText;
 
+
+    private int colpiEsplosi = 0;
     private float nextTimeToFire = 0f;
+    private bool inCooldown = false;
+    private float cooldownTimer = 0f;
 
     void Start()
     {
-        currentAmmo = maxAmmo;
-        if (transform.parent == null) isHeld = false;
-
         UpdateAmmoUI();
+        if (cooldownSlider != null)
+        {
+            cooldownSlider.maxValue = cooldownDurata;
+            cooldownSlider.value = cooldownDurata;
+            cooldownSlider.gameObject.SetActive(false);
+        }
     }
 
     void Update()
     {
         if (!isHeld)
         {
-            ammoText.gameObject.SetActive(false);
+            if (ammoText != null) ammoText.gameObject.SetActive(false);
+            if (cooldownSlider != null) cooldownSlider.gameObject.SetActive(false);
             return;
         }
-        if(isHeld)
+
+        if (ammoText != null) ammoText.gameObject.SetActive(true);
+
+        // Gestione cooldown
+        if (inCooldown)
         {
-            ammoText.gameObject.SetActive(true);
-        }
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-        {
+            cooldownTimer -= Time.deltaTime;
+
+            if (cooldownSlider != null)
+                cooldownSlider.value = cooldownTimer;
+
+            if (cooldownTimer <= 0f)
+            {
+                inCooldown = false;
+                colpiEsplosi = 0;
+                if (cooldownSlider != null) cooldownSlider.gameObject.SetActive(false);
+                UpdateAmmoUI();
+            }
             return; 
         }
 
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
         if (Input.GetMouseButton(0) && Time.time >= nextTimeToFire)
         {
-            if (currentAmmo > 0)
-            {
-                nextTimeToFire = Time.time + fireRate;
-                Shoot();
-            }
-            else
-            {
-                //aggiungere un suono magari??
-            }
+            nextTimeToFire = Time.time + fireRate;
+            Shoot();
         }
     }
 
     void Shoot()
     {
-        currentAmmo--;
+        colpiEsplosi++;
         UpdateAmmoUI();
 
         if (muzzleFlash != null) muzzleFlash.Play();
@@ -78,13 +96,8 @@ public class ColorWeapon : MonoBehaviour
             targetPoint = hit.point;
 
             NexusAntenna antennaColpita = hit.collider.GetComponent<NexusAntenna>();
-            
-            // --- CONTROLLO POTENZIATO ---
-            // Verifica che l'antenna non sia nulla E che sia ancora attiva in gioco
             if (antennaColpita != null && antennaColpita.gameObject.activeInHierarchy)
-            {
                 antennaColpita.RiceviColore(1);
-            }
         }
         else
         {
@@ -92,29 +105,34 @@ public class ColorWeapon : MonoBehaviour
         }
 
         Vector3 shootDirection = (targetPoint - firePoint.position).normalized;
-
         GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.LookRotation(shootDirection));
-
         Rigidbody rb = bullet.GetComponent<Rigidbody>();
-        if (rb != null)
+        if (rb != null) rb.linearVelocity = shootDirection * bulletSpeed;
+
+        // Dopo X colpi entra in cooldown
+        if (colpiEsplosi >= colpiPrimaCooldown)
         {
-            rb.linearVelocity = shootDirection * bulletSpeed;
+            inCooldown = true;
+            cooldownTimer = cooldownDurata;
+
+            if (cooldownSlider != null)
+            {
+                cooldownSlider.maxValue = cooldownDurata;
+                cooldownSlider.value = cooldownDurata;
+                cooldownSlider.gameObject.SetActive(true);
+            }
+            UpdateAmmoUI();
         }
     }
 
-    public void AddAmmo(int amount)
-    {
-        currentAmmo += amount;
-        if (currentAmmo > maxAmmo) currentAmmo = maxAmmo;
-        
-        UpdateAmmoUI();
-    }
-    
     void UpdateAmmoUI()
     {
         if (ammoText != null)
         {
-            ammoText.text = currentAmmo + " / " + maxAmmo;
+            if (inCooldown)
+                ammoText.text = "RICARICA..";
+            else
+                ammoText.text = (colpiPrimaCooldown - colpiEsplosi) + " / " + colpiPrimaCooldown;
         }
     }
 }

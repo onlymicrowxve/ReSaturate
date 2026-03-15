@@ -35,15 +35,6 @@ public class PickUpandDrop : MonoBehaviour
                     PickUpObject(hit.transform);
                 }
             }
-            else if (hand.transform.childCount > 0 && hit.transform.CompareTag("Ammo"))
-            {
-                ColorWeapon weapon = hand.GetComponentInChildren<ColorWeapon>();
-                if (weapon != null)
-                {
-                    weapon.AddAmmo(10);
-                    Destroy(hit.transform.gameObject);
-                }
-            }
         }
     }
 
