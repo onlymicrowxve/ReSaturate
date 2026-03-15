@@ -12,9 +12,6 @@ public class OggettoColorabile : MonoBehaviour
         
         if (rend != null && materialiColorati.Length > 0)
         {
-            // --- LA CORREZIONE ANTI-FREEZE ---
-            // Usiamo 'sharedMaterials' al posto di 'materials'. 
-            // Sostituisce i colori istantaneamente senza appesantire la memoria!
             rend.sharedMaterials = materialiColorati;
         }
     }
