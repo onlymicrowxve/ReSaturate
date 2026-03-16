@@ -1,4 +1,4 @@
-# Project Zero Waste
+# Re:Saturate
 Gioco per concorso Informatica Università di Camerino.
 
 ## Trama
