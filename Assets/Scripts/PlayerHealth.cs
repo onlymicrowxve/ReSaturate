@@ -3,39 +3,38 @@ using UnityEngine.UI;
 
 public class PlayerHealth : MonoBehaviour
 {
-    [Header("Statistiche Salute")]
-    public int maxHealth = 100;
-    public int currentHealth;
+    [Header("Vita")]
+    public int hpMax = 5;
+    public int hpAttuale;
 
-    [Header("Interfaccia (UI)")]
-    public Slider healthSlider; // Trascina qui uno Slider rosso dalla UI
+    [Header("UI (opzionale)")]
+    public Slider healthSlider;
 
     void Start()
     {
-        currentHealth = maxHealth;
+        hpAttuale = hpMax;
         if (healthSlider != null)
         {
-            healthSlider.maxValue = maxHealth;
-            healthSlider.value = currentHealth;
+            healthSlider.maxValue = hpMax;
+            healthSlider.value = hpAttuale;
         }
     }
 
     public void RiceviDanno(int danno)
     {
-        currentHealth -= danno;
-        
-        if (healthSlider != null)
-            healthSlider.value = currentHealth;
+        hpAttuale -= danno;
+        hpAttuale = Mathf.Clamp(hpAttuale, 0, hpMax);
 
-        if (currentHealth <= 0)
-        {
-            Muori();
-        }
+        if (healthSlider != null) healthSlider.value = hpAttuale;
+
+        if (hpAttuale <= 0) Muori();
     }
 
     void Muori()
     {
-        Debug.Log("GAME OVER! Sei diventato tutto grigio...");
-        // Qui in futuro metteremo il caricamento della scena di Game Over!
+        if (DeathMenu.Instance != null)
+            DeathMenu.Instance.MostraMenuMorte();
+        else
+            Debug.LogWarning("DeathMenu non trovato nella scena!");
     }
 }

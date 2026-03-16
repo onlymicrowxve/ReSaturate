@@ -3,257 +3,319 @@ using UnityEngine.AI;
 
 public class RobotAI : MonoBehaviour
 {
+    public enum StatoRobot { Pattuglia, Inseguimento, Combattimento, Morto }
+
+    [Header("Stato attuale (debug)")]
+    public StatoRobot stato = StatoRobot.Pattuglia;
+
+    [Header("Vita")]
+    public int hp = 5;
+
+    [Header("Pattuglia Area")]
+    public float raggioPattugliamento = 10f;
+    public bool usaPosizioneInizialeComeCentro = true;
+    public Vector3 centroManuale;
+    public float velocitaPattuglia = 2f;
+    public float attesaDestinazione = 1.5f;
+
+    private Vector3 _centroPattugliamento;
+    private Vector3 _destinazioneAttuale;
+
+    [Header("Rilevamento Player")]
+    public float raggioVista = 12f;
+    public float angoloVista = 90f;
+    public LayerMask layerPlayer;
+    public LayerMask layerOstacoli;
+
+    [Header("Combattimento")]
+    public float distanzaSparo = 10f;
+    public float distanzaMinSparo = 2f;
+    public float cadenzaSparo = 1.5f;
+    public GameObject proiettilePrefab;
+    public Transform puntoSparo;
+    public float velocitaProiettile = 20f;
+    public int dannoProiettile = 1;
+
+    [Header("Morte")]
+    public GameObject esplosioneVFX;
+
     [Header("Riferimenti")]
     public Animator animator;
-    public NavMeshAgent agent;
-    public Transform antenna; // L'antenna da proteggere
-    public Transform player;
-    
-    [Header("Combattimento")]
-    public float attackRange = 2f;
-    public float detectionRange = 15f;
-    public float attackCooldown = 2f;
-    public int maxHealth = 100;
-    public GameObject bulletPrefab;
-    public Transform firePoint;
-    public float bulletSpeed = 30f;
-    
-    [Header("Pattugliamento")]
-    public float patrolRadius = 10f;
-    public float waitTimeAtPoint = 3f;
-    
-    private int currentHealth;
-    private float lastAttackTime;
-    private Vector3 patrolPoint;
-    private float waitTimer;
-    private bool isWaiting;
-    private bool antennaDestroyed = false;
-    
-    private enum State { Patrol, Chase, Attack, Idle, Disabled }
-    private State currentState;
+
+    private NavMeshAgent agent;
+    private Transform player;
+    private float timerAttesa = 0f;
+    private float timerSparo = 0f;
+    private bool morto = false;
+
+    // Nomi parametri Animator (devono corrispondere ai tuoi)
+    private static readonly int animSpeed    = Animator.StringToHash("Speed");
+    private static readonly int animShoot    = Animator.StringToHash("Shoot");
+    private static readonly int animDie      = Animator.StringToHash("Die");
+    private static readonly int animReload   = Animator.StringToHash("Reload");
 
     void Start()
     {
-        currentHealth = maxHealth;
-        currentState = State.Patrol;
-        
-        if (player == null)
-            player = GameObject.FindGameObjectWithTag("Player")?.transform;
-        
-        SetNewPatrolPoint();
+        agent = GetComponent<NavMeshAgent>();
+        player = GameObject.FindGameObjectWithTag("Player")?.transform;
+
+        if (animator == null) animator = GetComponentInChildren<Animator>();
+
+        _centroPattugliamento = usaPosizioneInizialeComeCentro ? transform.position : centroManuale;
+        ScegliNuovaDestinazione();
+
+        agent.speed = velocitaPattuglia;
     }
 
     void Update()
     {
-        // Controlla se l'antenna è stata distrutta
-        if (antenna == null && !antennaDestroyed)
+        if (morto) return;
+
+        switch (stato)
         {
-            OnAntennaDestroyed();
-            return;
+            case StatoRobot.Pattuglia:    AggiornaPattuglia();    break;
+            case StatoRobot.Inseguimento: AggiornaInseguimento(); break;
+            case StatoRobot.Combattimento:AggiornaCombattimento();break;
         }
 
-        if (antennaDestroyed || currentState == State.Disabled)
-        {
-            animator.SetBool("Idle", true);
-            return;
-        }
-
-        float distanceToPlayer = player != null ? Vector3.Distance(transform.position, player.position) : Mathf.Infinity;
-
-        // State Machine
-        switch (currentState)
-        {
-            case State.Patrol:
-                Patrol();
-                
-                // Rileva il giocatore
-                if (distanceToPlayer <= detectionRange)
-                {
-                    currentState = State.Chase;
-                    isWaiting = false;
-                }
-                break;
-
-            case State.Chase:
-                Chase();
-                
-                if (distanceToPlayer <= attackRange)
-                {
-                    currentState = State.Attack;
-                }
-                else if (distanceToPlayer > detectionRange * 1.5f)
-                {
-                    currentState = State.Patrol;
-                    SetNewPatrolPoint();
-                }
-                break;
-
-            case State.Attack:
-                Attack();
-                
-                if (distanceToPlayer > attackRange)
-                {
-                    currentState = State.Chase;
-                }
-                break;
-        }
-
-        UpdateAnimations();
+        AggiornaAnimator();
     }
 
-    void Patrol()
+    // ──────────────────────────────────────────────
+    //  STATI
+    // ──────────────────────────────────────────────
+
+    void AggiornaPattuglia()
     {
-        if (isWaiting)
+        if (PlayerInVista())
         {
-            waitTimer -= Time.deltaTime;
-            if (waitTimer <= 0)
-            {
-                isWaiting = false;
-                SetNewPatrolPoint();
-            }
+            CambiStato(StatoRobot.Inseguimento);
             return;
         }
 
-        agent.SetDestination(patrolPoint);
-
-        if (Vector3.Distance(transform.position, patrolPoint) <= agent.stoppingDistance + 0.5f)
+        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
         {
-            isWaiting = true;
-            waitTimer = waitTimeAtPoint;
+            timerAttesa -= Time.deltaTime;
+            if (timerAttesa <= 0f)
+                ScegliNuovaDestinazione();
         }
     }
 
-    void Chase()
+    void ScegliNuovaDestinazione()
+    {
+        Vector3 puntoRandom = _centroPattugliamento + (Vector3)(Random.insideUnitCircle * raggioPattugliamento);
+        puntoRandom.y = transform.position.y;
+
+        NavMeshHit hit;
+        if (NavMesh.SamplePosition(puntoRandom, out hit, raggioPattugliamento, NavMesh.AllAreas))
+        {
+            _destinazioneAttuale = hit.position;
+            agent.SetDestination(_destinazioneAttuale);
+        }
+
+        timerAttesa = attesaDestinazione;
+    }
+
+    void AggiornaInseguimento()
     {
         if (player == null) return;
-        
+
+        float distanza = Vector3.Distance(transform.position, player.position);
+
+        // Se il player è abbastanza vicino → combatti
+        if (distanza <= distanzaSparo)
+        {
+            CambiStato(StatoRobot.Combattimento);
+            return;
+        }
+
+        // Se il player è sfuggito alla vista da troppo tempo → torna a pattugliare
+        if (!PlayerInVista() && distanza > raggioVista * 1.5f)
+        {
+            CambiStato(StatoRobot.Pattuglia);
+            return;
+        }
+
         agent.SetDestination(player.position);
     }
 
-    void Attack()
+    void AggiornaCombattimento()
     {
         if (player == null) return;
 
-        agent.SetDestination(transform.position); // Ferma il movimento
-        
-        // Ruota verso il giocatore
-        Vector3 direction = (player.position - transform.position).normalized;
-        direction.y = 0;
-        if (direction != Vector3.zero)
+        float distanza = Vector3.Distance(transform.position, player.position);
+
+        // Ruota verso il player
+        Vector3 dir = (player.position - transform.position);
+        dir.y = 0;
+        if (dir != Vector3.zero)
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), 5f * Time.deltaTime);
+
+        // Se il player si allontana troppo → insegui di nuovo
+        if (distanza > distanzaSparo * 1.3f)
         {
-            Quaternion lookRotation = Quaternion.LookRotation(direction);
-            transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 5f);
+            CambiStato(StatoRobot.Inseguimento);
+            return;
         }
+
+        // Mantieni distanza minima
+        if (distanza < distanzaMinSparo)
+            agent.SetDestination(transform.position - dir.normalized * 2f);
+        else
+            agent.ResetPath();
 
         // Spara
-        if (Time.time >= lastAttackTime + attackCooldown)
+        timerSparo -= Time.deltaTime;
+        if (timerSparo <= 0f)
         {
-            lastAttackTime = Time.time;
-            Shoot();
+            Spara();
+            timerSparo = cadenzaSparo;
         }
     }
 
-    void Shoot()
-    {
-        animator.SetTrigger("Shoot");
+    // ──────────────────────────────────────────────
+    //  SPARO
+    // ──────────────────────────────────────────────
 
-        if (bulletPrefab != null && firePoint != null && player != null)
+    void Spara()
+    {
+        if (proiettilePrefab == null || puntoSparo == null) return;
+
+        animator?.SetTrigger(animShoot);
+
+        Vector3 direzione = (player.position + Vector3.up * 1f - puntoSparo.position).normalized;
+        GameObject bullet = Instantiate(proiettilePrefab, puntoSparo.position, Quaternion.LookRotation(direzione));
+
+        RobotBullet rb = bullet.GetComponent<RobotBullet>();
+        if (rb != null) rb.danno = dannoProiettile;
+
+        Rigidbody rigidBody = bullet.GetComponent<Rigidbody>();
+        if (rigidBody != null) rigidBody.linearVelocity = direzione * velocitaProiettile;
+
+        Destroy(bullet, 5f);
+    }
+
+    // ──────────────────────────────────────────────
+    //  DANNO E MORTE
+    // ──────────────────────────────────────────────
+
+    public void RiceviDanno(int danno = 1)
+    {
+        if (morto) return;
+
+        hp -= danno;
+
+        // Se era in pattuglia, ora insegue
+        if (stato == StatoRobot.Pattuglia)
+            CambiStato(StatoRobot.Inseguimento);
+
+        if (hp <= 0) Muori();
+    }
+
+    void Muori()
+    {
+        morto = true;
+        stato = StatoRobot.Morto;
+
+        agent.isStopped = true;
+        agent.enabled = false;
+
+        animator?.SetTrigger(animDie);
+
+        if (esplosioneVFX != null)
+            Instantiate(esplosioneVFX, transform.position, Quaternion.identity);
+
+        // Disabilita collider ma lascia il corpo nella scena
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = false;
+
+        // Disabilita questo script
+        this.enabled = false;
+    }
+
+    // ──────────────────────────────────────────────
+    //  ATTIVAZIONE / DISATTIVAZIONE (antenna)
+    // ──────────────────────────────────────────────
+
+    // Chiamato da TutorialManager quando l'antenna viene distrutta
+    public void DisattivaRobot()
+    {
+        if (morto) return;
+        morto = true;
+        stato = StatoRobot.Morto;
+
+        agent.isStopped = true;
+        agent.enabled = false;
+
+        animator?.SetTrigger(animDie);
+
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = false;
+
+        this.enabled = false;
+    }
+
+    // ──────────────────────────────────────────────
+    //  UTILITÀ
+    // ──────────────────────────────────────────────
+
+    bool PlayerInVista()
+    {
+        if (player == null) return false;
+
+        Vector3 dirPlayer = player.position - transform.position;
+        float distanza = dirPlayer.magnitude;
+
+        if (distanza > raggioVista) return false;
+
+        float angolo = Vector3.Angle(transform.forward, dirPlayer);
+        if (angolo > angoloVista * 0.5f) return false;
+
+        // Raycast per controllare ostacoli tra robot e player
+        if (Physics.Raycast(transform.position + Vector3.up, dirPlayer.normalized, distanza, layerOstacoli))
+            return false;
+
+        return true;
+    }
+
+    void CambiStato(StatoRobot nuovoStato)
+    {
+        stato = nuovoStato;
+
+        switch (nuovoStato)
         {
-            Vector3 direction = (player.position - firePoint.position).normalized;
-            GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.LookRotation(direction));
-            
-            Rigidbody rb = bullet.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                rb.linearVelocity = direction * bulletSpeed;
-            }
-            
-            Destroy(bullet, 5f);
+            case StatoRobot.Pattuglia:
+                agent.speed = velocitaPattuglia;
+                ScegliNuovaDestinazione();
+                break;
+
+            case StatoRobot.Inseguimento:
+                agent.speed = velocitaPattuglia * 1.6f;
+                break;
+
+            case StatoRobot.Combattimento:
+                agent.speed = velocitaPattuglia * 0.5f;
+                timerSparo = 0.5f; // piccolo ritardo prima del primo sparo
+                break;
         }
     }
 
-    void SetNewPatrolPoint()
+    void AggiornaAnimator()
     {
-        Vector3 randomDirection = Random.insideUnitSphere * patrolRadius;
-        randomDirection += antenna != null ? antenna.position : transform.position;
-        
-        NavMeshHit hit;
-        if (NavMesh.SamplePosition(randomDirection, out hit, patrolRadius, NavMesh.AllAreas))
-        {
-            patrolPoint = hit.position;
-        }
+        if (animator == null) return;
+        animator.SetFloat(animSpeed, agent.enabled ? agent.velocity.magnitude : 0f);
     }
 
-    void UpdateAnimations()
+    void OnDrawGizmosSelected()
     {
-        float speed = agent.velocity.magnitude;
-        
-        animator.SetFloat("Speed", speed);
-        animator.SetBool("Idle", speed < 0.1f && currentState != State.Attack);
-        animator.SetBool("Walk", speed > 0.1f && speed < agent.speed * 0.6f);
-        animator.SetBool("Run", speed >= agent.speed * 0.6f);
-    }
-
-    public void TakeDamage(int damage)
-    {
-        if (antennaDestroyed) return;
-
-        currentHealth -= damage;
-
-        if (currentHealth <= 0)
-        {
-            Die();
-        }
-    }
-
-    void Die()
-    {
-        animator.SetTrigger("Die");
-        currentState = State.Disabled;
-        
-        if (agent != null)
-            agent.enabled = false;
-        
-        Destroy(gameObject, 3f); // Distruggi dopo l'animazione
-    }
-
-    void OnAntennaDestroyed()
-    {
-        antennaDestroyed = true;
-        currentState = State.Disabled;
-        
-        // Ferma il robot
-        if (agent != null)
-        {
-            agent.isStopped = true;
-            agent.enabled = false;
-        }
-        
-        // Animazione di disattivazione
-        animator.SetTrigger("Die");
-        
-        Debug.Log("Robot disattivato: antenna distrutta!");
-    }
-
-    // Chiamata dall'animazione di morte
-    public void OnDeathAnimationComplete()
-    {
-        Destroy(gameObject);
-    }
-
-    private void OnDrawGizmosSelected()
-    {
-        // Visualizza il raggio di rilevamento
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, detectionRange);
-        
-        // Visualizza il raggio di attacco
+        Vector3 centroVisuale = usaPosizioneInizialeComeCentro ? transform.position : centroManuale;
+        Gizmos.color = new Color(1f, 1f, 0f, 0.15f);
+        Gizmos.DrawSphere(centroVisuale, raggioPattugliamento);
+        Gizmos.color = new Color(1f, 1f, 0f, 0.6f);
+        Gizmos.DrawWireSphere(centroVisuale, raggioPattugliamento);
+        Gizmos.color = new Color(1f, 0.3f, 0f, 0.25f);
+        Gizmos.DrawWireSphere(transform.position, raggioVista);
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, attackRange);
-        
-        // Visualizza il raggio di pattugliamento
-        Gizmos.color = Color.blue;
-        Vector3 center = antenna != null ? antenna.position : transform.position;
-        Gizmos.DrawWireSphere(center, patrolRadius);
+        Gizmos.DrawWireSphere(transform.position, distanzaSparo);
     }
 }
