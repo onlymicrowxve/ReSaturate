@@ -17,18 +17,26 @@ public class ColorWeapon : MonoBehaviour
     [Header("Riferimenti")]
     public Camera fpsCamera;
     public Transform firePoint;
-    public GameObject bulletPrefab;
+
+    [Header("Proiettili Colorati")]
+    [Tooltip("Trascina qui i 3 prefab dei proiettili con colori diversi")]
+    public GameObject[] bulletPrefabs = new GameObject[3];
+
     public ParticleSystem muzzleFlash;
-    public Slider cooldownSlider; 
+    public Slider cooldownSlider;
 
     [Header("Interfaccia Utente (UI)")]
     public TextMeshProUGUI ammoText;
 
+    [Header("Audio")]
+    public AudioSource audioSourceArma;
+    public AudioClip suonoSparo;
 
     private int colpiEsplosi = 0;
     private float nextTimeToFire = 0f;
     private bool inCooldown = false;
     private float cooldownTimer = 0f;
+    private int lastBulletIndex = -1;
 
     void Start()
     {
@@ -52,7 +60,6 @@ public class ColorWeapon : MonoBehaviour
 
         if (ammoText != null) ammoText.gameObject.SetActive(true);
 
-        // Gestione cooldown
         if (inCooldown)
         {
             cooldownTimer -= Time.deltaTime;
@@ -67,7 +74,7 @@ public class ColorWeapon : MonoBehaviour
                 if (cooldownSlider != null) cooldownSlider.gameObject.SetActive(false);
                 UpdateAmmoUI();
             }
-            return; 
+            return;
         }
 
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
@@ -86,30 +93,25 @@ public class ColorWeapon : MonoBehaviour
         UpdateAmmoUI();
 
         if (muzzleFlash != null) muzzleFlash.Play();
+        if (audioSourceArma != null && suonoSparo != null)
+            audioSourceArma.PlayOneShot(suonoSparo);
 
+        // Calcola direzione tramite raycast
         Ray ray = fpsCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
-        RaycastHit hit;
-        Vector3 targetPoint;
+        Vector3 targetPoint = Physics.Raycast(ray, out RaycastHit hit, 100f)
+            ? hit.point
+            : ray.GetPoint(100f);
 
-        if (Physics.Raycast(ray, out hit, 100f))
+        // Spawna il proiettile — tutto il danno è gestito da PaintBullet
+        GameObject bulletPrefab = GetRandomBulletPrefab();
+        if (bulletPrefab != null)
         {
-            targetPoint = hit.point;
-
-            NexusAntenna antennaColpita = hit.collider.GetComponent<NexusAntenna>();
-            if (antennaColpita != null && antennaColpita.gameObject.activeInHierarchy)
-                antennaColpita.RiceviColore(1);
-        }
-        else
-        {
-            targetPoint = ray.GetPoint(100f);
+            Vector3 shootDirection = (targetPoint - firePoint.position).normalized;
+            GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.LookRotation(shootDirection));
+            Rigidbody rb = bullet.GetComponent<Rigidbody>();
+            if (rb != null) rb.linearVelocity = shootDirection * bulletSpeed;
         }
 
-        Vector3 shootDirection = (targetPoint - firePoint.position).normalized;
-        GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.LookRotation(shootDirection));
-        Rigidbody rb = bullet.GetComponent<Rigidbody>();
-        if (rb != null) rb.linearVelocity = shootDirection * bulletSpeed;
-
-        // Dopo X colpi entra in cooldown
         if (colpiEsplosi >= colpiPrimaCooldown)
         {
             inCooldown = true;
@@ -123,6 +125,32 @@ public class ColorWeapon : MonoBehaviour
             }
             UpdateAmmoUI();
         }
+    }
+
+    GameObject GetRandomBulletPrefab()
+    {
+        int count = 0;
+        for (int i = 0; i < bulletPrefabs.Length; i++)
+            if (bulletPrefabs[i] != null) count++;
+
+        if (count == 0)
+        {
+            Debug.LogWarning("ColorWeapon: nessun bulletPrefab assegnato!");
+            return null;
+        }
+
+        if (count == 1)
+        {
+            for (int i = 0; i < bulletPrefabs.Length; i++)
+                if (bulletPrefabs[i] != null) return bulletPrefabs[i];
+        }
+
+        int newIndex;
+        do { newIndex = Random.Range(0, bulletPrefabs.Length); }
+        while (bulletPrefabs[newIndex] == null || newIndex == lastBulletIndex);
+
+        lastBulletIndex = newIndex;
+        return bulletPrefabs[newIndex];
     }
 
     void UpdateAmmoUI()

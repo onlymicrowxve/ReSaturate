@@ -2,18 +2,10 @@ using UnityEngine;
 
 public class PortaleTutorial : MonoBehaviour
 {
-    private bool playerVicino = false;
-
-    void Update()
-    {
-        
-    }
-
     void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Player"))
         {
-            playerVicino = true;
             if (TutorialManager.Instance != null)
                 TutorialManager.Instance.MostraUIUscita(true);
         }
@@ -32,7 +24,6 @@ public class PortaleTutorial : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            playerVicino = false;
             if (TutorialManager.Instance != null)
                 TutorialManager.Instance.MostraUIUscita(false);
         }

@@ -6,11 +6,7 @@ public class NexusAntenna : MonoBehaviour
     public int hp = 5;
 
     [Header("Zona Controllata")]
-    [Tooltip("Trascina qui gli oggetti con lo script OggettoColorabile")]
     public OggettoColorabile[] edificiDaColorare;
-
-    [Header("Effetti Visivi (Opzionale)")]
-    public GameObject esplosioneColorePrefab;
 
     private bool giaDistrutta = false;
 
@@ -29,21 +25,11 @@ public class NexusAntenna : MonoBehaviour
 
     void EsplosioneDiVita()
     {
-        // Ricolora tutti gli edifici collegati
         foreach (OggettoColorabile obj in edificiDaColorare)
-        {
-            if (obj != null)
-                obj.Ricolora();
-        }
+            if (obj != null) obj.Ricolora();
 
-        // Effetto esplosione visiva
-        if (esplosioneColorePrefab != null)
-            Instantiate(esplosioneColorePrefab, transform.position, Quaternion.identity);
-
-        // --- NOTIFICA IL TUTORIAL MANAGER ---
         if (TutorialManager.Instance != null)
             TutorialManager.Instance.OnAntennaDistrutta();
-        // ------------------------------------
 
         gameObject.SetActive(false);
         Destroy(gameObject, 0.1f);

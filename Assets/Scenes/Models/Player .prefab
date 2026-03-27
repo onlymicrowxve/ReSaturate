@@ -110,6 +110,7 @@ GameObject:
   - component: {fileID: 6830919964180699967}
   - component: {fileID: 3974268016770309137}
   - component: {fileID: 1888389116387530781}
+  - component: {fileID: 4597047373943866098}
   m_Layer: 7
   m_Name: 'Player '
   m_TagString: Player
@@ -125,8 +126,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3681639757315305891}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: 0.037509523, z: -0, w: -0.99929637}
-  m_LocalPosition: {x: 623.08, y: 4.1, z: 150.77}
+  m_LocalRotation: {x: -0, y: -0.6800849, z: -0, w: -0.7331334}
+  m_LocalPosition: {x: 384.37537, y: 3.535, z: 289.0366}
   m_LocalScale: {x: 0.9046064, y: 0.9046064, z: 0.9046064}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -134,7 +135,7 @@ Transform:
   - {fileID: 8986881142237315791}
   - {fileID: 1374398407732973702}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: -4.299, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 85.701, z: 0}
 --- !u!33 &2187379687877508797
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -264,9 +265,11 @@ MonoBehaviour:
   jumpHeight: 0.7
   groundCheck: {fileID: 8986881142237315791}
   groundDistance: 0.4
-  groundMask:
-    serializedVersion: 2
-    m_Bits: 8
+  audioSourcePassi: {fileID: 4597047373943866098}
+  suoniPassi:
+  - {fileID: 8300000, guid: f82b2b8431000e3459286e375e21a1b5, type: 3}
+  intervalloPassoCamminata: 0.67
+  intervalloPassoCorsa: 0.3
 --- !u!114 &3974268016770309137
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -297,6 +300,103 @@ MonoBehaviour:
   heightOffset: 1
   Salire: {fileID: 0}
   Scendere: {fileID: 0}
+--- !u!82 &4597047373943866098
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3681639757315305891}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &3689309756758654759
 GameObject:
   m_ObjectHideFlags: 0
@@ -458,10 +558,15 @@ MonoBehaviour:
   cooldownDurata: 4
   fpsCamera: {fileID: 6682806565546823339}
   firePoint: {fileID: 4875008645953091880}
-  bulletPrefab: {fileID: 8334799305351345459, guid: 002cde0362637324e9a00739e558531a, type: 3}
+  bulletPrefabs:
+  - {fileID: 8334799305351345459, guid: 002cde0362637324e9a00739e558531a, type: 3}
+  - {fileID: 8334799305351345459, guid: 22634507ebd36454cb1f237d1807c217, type: 3}
+  - {fileID: 8334799305351345459, guid: c108e1ba4d0004243a6c5fb680b2f6c6, type: 3}
   muzzleFlash: {fileID: 0}
   cooldownSlider: {fileID: 0}
   ammoText: {fileID: 0}
+  audioSourceArma: {fileID: 0}
+  suonoSparo: {fileID: 8300000, guid: 75cfbd9ed4ef3294398b203fa7585408, type: 3}
 --- !u!1 &4918018129159500269
 GameObject:
   m_ObjectHideFlags: 0

@@ -12,7 +12,7 @@ public class Movement : MonoBehaviour
     [Header("Impostazioni Stamina")]
     public Slider staminaSlider;
     public float maxStamina = 100f;
-    public float staminaDrain = 15f; 
+    public float staminaDrain = 15f;
     public float staminaRegen = 10f;
     public float minStaminaToRun = 20f;
 
@@ -26,7 +26,16 @@ public class Movement : MonoBehaviour
     [Header("Controllo Terreno")]
     public Transform groundCheck;
     public float groundDistance = 0.4f;
-    public LayerMask groundMask;
+
+    [Header("Audio Passi")]
+    public AudioSource audioSourcePassi;
+    public AudioClip[] suoniPassi;
+    public float intervalloPassoCamminata = 0.5f;
+    public float intervalloPassoCorsa = 0.3f;
+
+    private float timerPasso = 0f;
+    private int lastFootstepIndex = -1;
+    private LayerMask groundMask;
 
     Vector3 velocity;
     bool isGrounded;
@@ -40,11 +49,17 @@ public class Movement : MonoBehaviour
             staminaSlider.maxValue = maxStamina;
             staminaSlider.value = currentStamina;
         }
+
+        groundMask = ~(1 << gameObject.layer);
+
+        if (audioSourcePassi == null)
+            Debug.LogWarning("PASSI: audioSourcePassi non assegnato nell'Inspector.");
+        if (suoniPassi == null || suoniPassi.Length == 0)
+            Debug.LogWarning("PASSI: suoniPassi vuoto. Aggiungi almeno un AudioClip.");
     }
 
     void Update()
     {
-
         isGrounded = Physics.CheckSphere(groundCheck.position, groundDistance, groundMask);
         if (isGrounded && velocity.y < 0) velocity.y = -2f;
 
@@ -56,7 +71,9 @@ public class Movement : MonoBehaviour
         if (currentStamina <= 0) canRun = false;
         else if (currentStamina >= minStaminaToRun) canRun = true;
 
-        if (Input.GetKey(runKey) && isMoving && canRun)
+        bool isRunning = Input.GetKey(runKey) && isMoving && canRun;
+
+        if (isRunning)
         {
             currentSpeed = runSpeed;
             currentStamina -= staminaDrain * Time.deltaTime;
@@ -72,13 +89,38 @@ public class Movement : MonoBehaviour
 
         controller.Move(move * currentSpeed * Time.deltaTime);
 
-        if (Input.GetButtonDown("Jump") && isGrounded)
+        // Audio passi — stesso suono, intervallo più veloce durante la corsa
+        if (isMoving && isGrounded)
         {
-            velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            timerPasso -= Time.deltaTime;
+            if (timerPasso <= 0f)
+            {
+                SuonaPasso();
+                timerPasso = isRunning ? intervalloPassoCorsa : intervalloPassoCamminata;
+            }
         }
+        else
+        {
+            timerPasso = 0f;
+        }
+
+        if (Input.GetButtonDown("Jump") && isGrounded)
+            velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
 
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
+    }
+
+    void SuonaPasso()
+    {
+        if (audioSourcePassi == null || suoniPassi == null || suoniPassi.Length == 0) return;
+
+        int index;
+        do { index = Random.Range(0, suoniPassi.Length); }
+        while (suoniPassi.Length > 1 && index == lastFootstepIndex);
+
+        lastFootstepIndex = index;
+        audioSourcePassi.PlayOneShot(suoniPassi[index]);
     }
 
     void RegenStamina()
